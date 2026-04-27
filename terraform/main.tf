@@ -23,25 +23,8 @@ locals {
   cache_policy_disabled_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   all_viewer_except_host_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
   default_subnet_ids        = slice(sort(data.aws_subnets.default.ids), 0, 2)
-  bootstrap_lambda_contents = <<-EOF
-    def handler(event, context):
-        return {
-            "statusCode": 503,
-            "headers": {"content-type": "application/json"},
-            "body": "{\"detail\":\"Bootstrap placeholder. Deploy application zip with deploy_lambda().\"}",
-        }
-  EOF
 }
 
-data "archive_file" "bootstrap_lambda_zip" {
-  type        = "zip"
-  output_path = "${path.module}/bootstrap_lambda.zip"
-
-  source {
-    content  = local.bootstrap_lambda_contents
-    filename = "lambda_handler.py"
-  }
-}
 
 data "aws_vpc" "default" {
   default = true
@@ -257,6 +240,14 @@ resource "aws_iam_role_policy" "lambda_inline" {
 resource "aws_apigatewayv2_api" "http" {
   name          = "${local.name}-http-api"
   protocol_type = "HTTP"
+
+   cors_configuration {
+    allow_credentials = false  # Cannot be true when allow_origins is "*"
+    allow_headers     = ["authorization", "content-type", "x-amz-date", "x-api-key", "x-amz-security-token"]
+    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_origins     = ["*"]  # CORS is handled in Lambda via environment variables
+    max_age           = 300
+  }
 }
 
 resource "aws_cloudfront_distribution" "main" {
@@ -269,8 +260,11 @@ resource "aws_cloudfront_distribution" "main" {
     domain_name = aws_s3_bucket.static_site.bucket_regional_domain_name
     origin_id   = local.static_origin_id
 
-    s3_origin_config {
-      origin_access_identity = ""
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
 
@@ -283,8 +277,6 @@ resource "aws_cloudfront_distribution" "main" {
       https_port               = 443
       origin_protocol_policy   = "https-only"
       origin_ssl_protocols     = ["TLSv1.2"]
-      origin_read_timeout      = 30
-      origin_keepalive_timeout = 5
     }
   }
 
@@ -294,7 +286,18 @@ resource "aws_cloudfront_distribution" "main" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     compress               = true
-    cache_policy_id        = local.cache_policy_optimized_id
+    # cache_policy_id        = local.cache_policy_optimized_id
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
   }
 
   ordered_cache_behavior {
@@ -303,9 +306,22 @@ resource "aws_cloudfront_distribution" "main" {
     viewer_protocol_policy   = "redirect-to-https"
     allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods           = ["GET", "HEAD"]
+    
     compress                 = true
-    cache_policy_id          = local.cache_policy_disabled_id
-    origin_request_policy_id = local.all_viewer_except_host_id
+    # cache_policy_id          = local.cache_policy_disabled_id
+    # origin_request_policy_id = local.all_viewer_except_host_id
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "Content-Type", "Accept"]
+      cookies {
+        forward = "all"
+      }
+    }
+
+    min_ttl                = 0
+    default_ttl            = 0
+    max_ttl                = 0
   }
 
   custom_error_response {
@@ -342,8 +358,8 @@ resource "aws_lambda_function" "api" {
   timeout       = 120
   memory_size   = 1024
 
-  filename         = data.archive_file.bootstrap_lambda_zip.output_path
-  source_code_hash = data.archive_file.bootstrap_lambda_zip.output_base64sha256
+  filename         = "${path.module}/../backend/lambda-deployment.zip"
+  source_code_hash = filebase64sha256("${path.module}/../backend/lambda-deployment.zip")
 
   vpc_config {
     subnet_ids         = local.default_subnet_ids
@@ -416,7 +432,6 @@ resource "aws_apigatewayv2_integration" "lambda_proxy" {
   api_id                 = aws_apigatewayv2_api.http.id
   integration_type       = "AWS_PROXY"
   integration_uri        = aws_lambda_function.api.invoke_arn
-  integration_method     = "POST"
   payload_format_version = "2.0"
 }
 
@@ -426,9 +441,15 @@ resource "aws_apigatewayv2_route" "proxy" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
 }
 
-resource "aws_apigatewayv2_route" "root" {
+resource "aws_apigatewayv2_route" "api_any" {
   api_id    = aws_apigatewayv2_api.http.id
-  route_key = "ANY /"
+  route_key = "ANY /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
+}
+
+resource "aws_apigatewayv2_route" "api_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /api/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.lambda_proxy.id}"
 }
 
@@ -436,6 +457,11 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.http.id
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 100
+    throttling_rate_limit  = 100
+  }
 }
 
 resource "aws_lambda_permission" "allow_apigw_invoke" {
