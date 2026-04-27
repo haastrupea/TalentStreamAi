@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
   },
   ...(!useStaticExport
     ? {
+        // Next dev rewrite proxy defaults to 30s (see next/dist/server/lib/router-utils/proxy-request.js).
+        // POST /applications/tailor often exceeds that (LLM chain); without this, the proxy resets (ECONNRESET).
+        experimental: {
+          proxyTimeout: 120_000,
+        },
         async rewrites() {
           if (process.env.NEXT_PUBLIC_API_URL) {
             return [];
