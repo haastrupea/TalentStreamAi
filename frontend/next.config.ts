@@ -24,7 +24,14 @@ const nextConfig: NextConfig = {
   // Repo root also has a package-lock.json; set tracing root so Next does not
   // infer the monorepo parent (see "multiple lockfiles" dev warning).
   outputFileTracingRoot: appDir,
-  ...(useStaticExport ? { output: "export" as const } : {}),
+  ...(useStaticExport
+    ? {
+        output: "export" as const,
+        // S3 + CloudFront map URLs like /dashboard/ to object key dashboard/index.html.
+        // Without this, Next emits dashboard.html while users request /dashboard (404).
+        trailingSlash: true,
+      }
+    : {}),
   images: {
     unoptimized: true,
   },

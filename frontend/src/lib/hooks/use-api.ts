@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/api";
 import type {
   Application,
   DashboardStats,
+  Entitlements,
   Profile,
   Resume,
   TailorRequest,
@@ -38,6 +39,14 @@ export function useProfile(
     queryKey: ["profile"],
     queryFn: () => fetcher<Profile>("/api/v1/profile"),
     ...opts,
+  });
+}
+
+export function useEntitlements() {
+  const fetcher = useAuthedFetch();
+  return useQuery<Entitlements>({
+    queryKey: ["entitlements"],
+    queryFn: () => fetcher<Entitlements>("/api/v1/entitlements"),
   });
 }
 
@@ -99,6 +108,7 @@ export function useTailorApplication() {
       queryClient.invalidateQueries({ queryKey: ["resumes"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["entitlements"] });
     },
   });
 }
@@ -120,6 +130,7 @@ export function useUploadBaseResume() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["resumes"] });
       queryClient.invalidateQueries({ queryKey: ["resume"] });
+      queryClient.invalidateQueries({ queryKey: ["entitlements"] });
     },
   });
 }
@@ -142,6 +153,7 @@ export function useUploadResume() {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["resumes"] });
       queryClient.invalidateQueries({ queryKey: ["resume"] });
+      queryClient.invalidateQueries({ queryKey: ["entitlements"] });
     },
   });
 }

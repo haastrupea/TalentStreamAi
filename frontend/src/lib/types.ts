@@ -84,3 +84,24 @@ export type TailorResponse = {
   gaps: GapItem[];
   analysis: MatchAnalysis;
 };
+
+export type EntitlementLimits = {
+  monthlyLlmTokenBudget: number;
+  monthlyApplicationLimit: number;
+  monthlyBaseResumeLimit: number;
+};
+
+export type EntitlementUsage = {
+  llmPromptTokens: number;
+  llmCompletionTokens: number;
+  totalLlmTokens: number;
+  applicationsCreated: number;
+  baseResumeUploads: number;
+};
+
+export type Entitlements = {
+  plan: string;
+  period: string;
+  limits: EntitlementLimits;
+  usage: EntitlementUsage;
+};

@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/error-message";
 import {
+    useEntitlements,
     useResumes,
     useTailorApplication,
     useUploadBaseResume,
@@ -45,15 +46,15 @@ type Mode = "url" | "description";
 
 export default function ApplyPage() {
     const { data: resumes, isLoading: resumesLoading } = useResumes();
+    const { data: entitlements } = useEntitlements();
     const tailor = useTailorApplication();
     const uploadBaseResume = useUploadBaseResume();
     const uploadResumeAdd = useUploadResume();
     const applyUploadInputRef = useRef<HTMLInputElement>(null);
 
-    const resumeList = resumes ?? [];
     const baseResumes = useMemo(
-        () => resumeList.filter((r) => r.isBase === true),
-        [resumeList],
+        () => (resumes ?? []).filter((r) => r.isBase === true),
+        [resumes],
     );
     const defaultResumeId = useMemo(() => baseResumes[0]?.id, [baseResumes]);
 
@@ -73,10 +74,28 @@ export default function ApplyPage() {
         Boolean(selectedResumeId) &&
         !baseResumes.some((r) => r.id === selectedResumeId);
     const isUploading = uploadBaseResume.isPending || uploadResumeAdd.isPending;
+    const applicationsRemaining = Math.max(
+        0,
+        (entitlements?.limits.monthlyApplicationLimit ?? 0) -
+            (entitlements?.usage.applicationsCreated ?? 0),
+    );
+    const tokensRemaining = Math.max(
+        0,
+        (entitlements?.limits.monthlyLlmTokenBudget ?? 0) -
+            (entitlements?.usage.totalLlmTokens ?? 0),
+    );
+    const baseUploadsRemaining = Math.max(
+        0,
+        (entitlements?.limits.monthlyBaseResumeLimit ?? 0) -
+            (entitlements?.usage.baseResumeUploads ?? 0),
+    );
+    const blockedByLimits =
+        applicationsRemaining <= 0 || tokensRemaining <= 0;
     const canSubmit =
         Boolean(effectiveResumeId) &&
+        !blockedByLimits &&
         ((mode === "url" && jobUrl.trim().length > 0) ||
-            (mode === "description" && jobDescription.trim().length > 30));
+            (mode === "description" && jobDescription.trim().length >= 40));
 
     function handleApplyUploadChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -142,6 +161,20 @@ export default function ApplyPage() {
             </div>
 
             <form onSubmit={handleSubmit} className='space-y-6'>
+                {entitlements ? (
+                    <Card>
+                        <CardContent className='py-4 text-sm text-muted-foreground'>
+                            Plan <span className='font-medium text-foreground'>{entitlements.plan}</span> ·{" "}
+                            {applicationsRemaining} applications left ·{" "}
+                            {tokensRemaining.toLocaleString()} tokens left this month
+                            {blockedByLimits ? (
+                                <span className='ml-1 text-destructive'>
+                                    (limit reached; upgrade to continue)
+                                </span>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+                ) : null}
                 <Card>
                     <CardHeader>
                         <CardTitle className='text-base'>
@@ -267,7 +300,7 @@ export default function ApplyPage() {
                                                 type='button'
                                                 variant='outline'
                                                 className='w-full'
-                                                disabled={isUploading}
+                                                disabled={isUploading || baseUploadsRemaining <= 0}
                                                 onClick={() =>
                                                     applyUploadInputRef.current?.click()
                                                 }
@@ -284,6 +317,11 @@ export default function ApplyPage() {
                                                     </>
                                                 )}
                                             </Button>
+                                            {baseUploadsRemaining <= 0 ? (
+                                                <p className='text-xs text-destructive'>
+                                                    You&apos;ve reached your monthly base resume upload limit.
+                                                </p>
+                                            ) : null}
                                             <label className='flex cursor-pointer items-start gap-2 text-xs text-muted-foreground'>
                                                 <input
                                                     type='checkbox'

@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/error-message";
-import { useUploadBaseResume } from "@/lib/hooks/use-api";
+import { useEntitlements, useUploadBaseResume } from "@/lib/hooks/use-api";
 import { toast } from "sonner";
 
 const ACCEPTED = ".pdf,.doc,.docx,.txt";
@@ -23,7 +23,13 @@ export default function OnboardingPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const { data: entitlements } = useEntitlements();
   const upload = useUploadBaseResume();
+  const baseUploadsRemaining = Math.max(
+    0,
+    (entitlements?.limits.monthlyBaseResumeLimit ?? 0) -
+      (entitlements?.usage.baseResumeUploads ?? 0),
+  );
 
   function handlePick() {
     inputRef.current?.click();
@@ -72,6 +78,7 @@ export default function OnboardingPage() {
             <button
               type="button"
               onClick={handlePick}
+              disabled={baseUploadsRemaining <= 0}
               className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 transition-colors hover:bg-accent/40"
             >
               <Upload className="h-8 w-8 text-muted-foreground" />
@@ -95,6 +102,11 @@ export default function OnboardingPage() {
                 {(upload.error as Error).message}
               </p>
             ) : null}
+            {baseUploadsRemaining <= 0 ? (
+              <p className="text-sm text-destructive">
+                You have reached your monthly base resume upload limit for your current plan.
+              </p>
+            ) : null}
 
             <div className="flex items-center justify-between gap-3 pt-2">
               <Button asChild variant="ghost">
@@ -102,7 +114,7 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 onClick={handleContinue}
-                disabled={!file || upload.isPending}
+                disabled={!file || upload.isPending || baseUploadsRemaining <= 0}
               >
                 {upload.isPending ? (
                   <>
