@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.core.jwks import ClerkJwtVerifier
+from app.core.request_context import set_user_id
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ def get_current_user(
     if settings.auth_mode == "disabled":
         u = AuthenticatedUser(user_id="anonymous", claims={"auth_mode": "disabled"})
         structlog.contextvars.bind_contextvars(user_id=u.user_id)
+        set_user_id(u.user_id)
         return u
 
     if settings.auth_mode != "clerk_jwks":
@@ -47,4 +49,5 @@ def get_current_user(
 
     u = AuthenticatedUser(user_id=user_id, claims=claims)
     structlog.contextvars.bind_contextvars(user_id=u.user_id)
+    set_user_id(u.user_id)
     return u

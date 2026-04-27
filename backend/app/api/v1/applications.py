@@ -48,10 +48,13 @@ async def tailor_application(
     try:
         app_rec, _tailored, pl = await run_tailor_for_user(
             user_id=user.user_id,
+            claims=user.claims,
             base_resume_id=body.base_resume_id,
             job_url=body.job_url,
             job_description=body.job_description,
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         log.info("tailor_rejected", reason=str(e))
         raise HTTPException(status_code=400, detail=str(e)) from e

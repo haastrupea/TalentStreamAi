@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 import structlog
+from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from app.core import metrics
@@ -15,14 +16,23 @@ from app.core.config import settings
 from app.core.db import (
     ApplicationRecord,
     StoredDocument,
+    bump_usage,
     create_application,
     create_document,
     get_document,
+    get_usage_snapshot,
     update_document_meta,
 )
+from app.services.entitlements import resolve_user_plan
 from app.services.draft_email import parse_draft_email
+from app.services.guardrails import (
+    enforce_job_description_like,
+    enforce_prompt_injection_guard,
+    enforce_resume_like,
+)
 from app.services.job_text import job_data_to_text
 from app.services.langgraph.streaming_agent import run_tailor_pipeline
+from app.services.usage_limits import estimate_tailor_tokens, limit_detail
 from app.tools.job_fetcher import fetch_job_description
 
 slog = structlog.get_logger(__name__)
@@ -71,6 +81,7 @@ def _gaps_to_items(missing: list[str]) -> list[dict[str, Any]]:
 async def run_tailor_for_user(
     *,
     user_id: str,
+    claims: dict[str, Any],
     base_resume_id: str,
     job_url: str | None,
     job_description: str | None,
@@ -84,6 +95,8 @@ async def run_tailor_for_user(
         raise ValueError("Base resume not found")
     if len(base.text) > settings.max_text_chars:
         raise ValueError("Base resume text exceeds server limit")
+    enforce_prompt_injection_guard(text=base.text, field_name="base_resume")
+    enforce_resume_like(text=base.text, field_name="base_resume")
 
     job_data: dict[str, Any] | None = None
     jd_text = (job_description or "").strip()
@@ -102,6 +115,42 @@ async def run_tailor_for_user(
 
     if len(jd_text) > settings.max_text_chars:
         raise ValueError("Job description is too long; shorten or trim the posting.")
+    enforce_prompt_injection_guard(text=jd_text, field_name="job_description")
+    enforce_job_description_like(text=jd_text, field_name="job_description")
+
+    plan = resolve_user_plan(claims)
+    usage = await run_in_threadpool(get_usage_snapshot, user_id=user_id)
+    if usage.applications_created >= plan.limits.monthly_application_limit:
+        metrics.limit_rejections.labels("applications").inc()
+        raise HTTPException(
+            status_code=403,
+            detail=limit_detail(
+                code="LIMIT_APPLICATIONS",
+                message="Application limit reached for this plan.",
+                plan=plan.plan_key,
+                period_yyyymm=usage.period_yyyymm,
+                limit=plan.limits.monthly_application_limit,
+                used=usage.applications_created,
+            ),
+        )
+    estimated_tokens = estimate_tailor_tokens(
+        resume_text=base.text,
+        job_description_text=jd_text,
+        llm_max_tokens=settings.llm_max_tokens,
+    )
+    if usage.total_llm_tokens + estimated_tokens > plan.limits.monthly_llm_token_budget:
+        metrics.limit_rejections.labels("llm_tokens").inc()
+        raise HTTPException(
+            status_code=403,
+            detail=limit_detail(
+                code="LIMIT_TOKENS",
+                message="Not enough tokens left in your monthly plan budget for this run.",
+                plan=plan.plan_key,
+                period_yyyymm=usage.period_yyyymm,
+                limit=plan.limits.monthly_llm_token_budget,
+                used=usage.total_llm_tokens,
+            ),
+        )
 
     t0 = time.perf_counter()
     try:
@@ -171,6 +220,11 @@ async def run_tailor_for_user(
         resume_id=tailored.id,
         cover_letter=cover_letter[: settings.max_output_chars],
         meta=app_meta,
+    )
+    await run_in_threadpool(
+        bump_usage,
+        user_id=user_id,
+        applications_created=1,
     )
 
     await run_in_threadpool(

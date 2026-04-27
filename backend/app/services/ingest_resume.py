@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import AuthenticatedUser
 from app.core.config import settings
 from app.core.db import StoredDocument, create_document, upsert_user_profile
+from app.services.guardrails import enforce_prompt_injection_guard, enforce_resume_like
 from app.services.text_guardrails import normalize_user_text
 from app.services.uploads import delete_saved_upload, extract_text, save_upload, validate_upload
 
@@ -62,6 +63,8 @@ async def ingest_uploaded_resume(
     saved, detected_type, extracted = await run_in_threadpool(_process)
     if not extracted:
         raise HTTPException(status_code=400, detail="Could not extract text from resume")
+    enforce_prompt_injection_guard(text=extracted, field_name="resume_upload")
+    enforce_resume_like(text=extracted, field_name="resume_upload")
 
     title = (file.filename or "").rsplit("/")[-1][:200]
     meta: dict[str, Any] = {

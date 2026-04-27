@@ -12,6 +12,8 @@ from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait
 
 from app.core.config import settings
 from app.core import metrics
+from app.core.db import bump_usage
+from app.core.request_context import get_context_user_id
 from app.services.llm.json_parsing import parse_json_object
 from app.services.llm.safety import llm_output_safety_flags
 from app.services.observability.langfuse_tracing import (
@@ -155,6 +157,13 @@ class LlmClient:
                     completion_tokens=ct,
                     duration_ms=round(elapsed * 1000, 2),
                 )
+                uid = get_context_user_id()
+                if uid:
+                    bump_usage(
+                        user_id=uid,
+                        prompt_tokens=pt,
+                        completion_tokens=ct,
+                    )
 
             try:
                 text = data["choices"][0]["message"]["content"]

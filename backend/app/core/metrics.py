@@ -37,6 +37,11 @@ llm_latency = Histogram(
 
 # Domain
 tailor_runs = Counter("tailor_runs_total", "Resume tailor runs", ("outcome",))
+limit_rejections = Counter(
+    "limit_rejections_total",
+    "Requests rejected by quota/validation guardrails",
+    ("reason",),
+)
 
 
 def metrics_payload() -> bytes:

@@ -105,6 +105,23 @@ Both FastAPI (`pydantic-settings`) and Next.js (via `dotenv-cli` in `frontend/pa
 | `OPENROUTER_API_KEY` | API | OpenRouter key; used for chat when set (with `LLM_BASE_URL` for OpenRouter). |
 | `OPENAI_API_KEY` | API | Used for chat when `OPENROUTER_API_KEY` is unset; optional when OpenRouter is set. |
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | API | Optional. [Langfuse](https://langfuse.com) project keys for LLM tracing; set with `LANGFUSE_BASE_URL` (or `LANGFUSE_HOST`) for EU/US/self-hosted. |
+| `PLAN_CLAIM_PATH` / `PLAN_ALIAS_MAP` / `PLAN_DEFAULT` | API | Clerk Billing plan extraction from session JWT claims and mapping to internal plan keys (`free`, `starter`, `pro`). |
+| `*_MONTHLY_*_LIMIT` and `*_MONTHLY_LLM_TOKEN_BUDGET` | API | Per-plan monthly quotas for applications, base resume uploads, and LLM tokens enforced by the API. |
+| `INPUT_INJECTION_MODE` / `EXPECTED_INPUT_MODE` | API | Guard policy mode (`warn` or `block`) for prompt-injection heuristics and document-type validation. |
+
+### Clerk billing claim setup
+
+The backend reads subscription tier from JWT claims (`AuthenticatedUser.claims`) and never calls Clerk on every API request. In Clerk:
+
+1. Ensure your session token template includes the billing signal you want to trust (for example `public_metadata.plan`, a custom plan claim, or a price/product id).
+2. Set `PLAN_CLAIM_PATH` to that nested claim path (default `public_metadata.plan`).
+3. Use `PLAN_ALIAS_MAP` to map Clerk ids to internal plan keys. Example:
+
+```bash
+PLAN_ALIAS_MAP=price_test_starter:starter,price_test_pro:pro
+```
+
+Use Clerk test mode with test payment methods in development; production should keep the same mapping logic, with only Clerk live keys and live plan ids changing.
 
 ## Run the full stack in Docker
 

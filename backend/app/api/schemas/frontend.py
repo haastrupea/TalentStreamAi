@@ -50,6 +50,30 @@ class DashboardStatsOut(BaseModel):
     resumes_generated: int
 
 
+class PlanLimitsOut(BaseModel):
+    model_config = _cc()
+    monthly_llm_token_budget: int
+    monthly_application_limit: int
+    monthly_base_resume_limit: int
+
+
+class LimitUsageOut(BaseModel):
+    model_config = _cc()
+    llm_prompt_tokens: int
+    llm_completion_tokens: int
+    total_llm_tokens: int
+    applications_created: int
+    base_resume_uploads: int
+
+
+class EntitlementsOut(BaseModel):
+    model_config = _cc()
+    plan: str
+    period: str
+    limits: PlanLimitsOut
+    usage: LimitUsageOut
+
+
 class GapItemOut(BaseModel):
     model_config = _cc()
     skill: str

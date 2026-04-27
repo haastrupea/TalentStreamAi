@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.core.db import create_document, get_document
+from app.services.guardrails import enforce_job_description_like, enforce_prompt_injection_guard
 from app.services.text_guardrails import normalize_user_text
 
 router = APIRouter()
@@ -23,6 +24,8 @@ def create_job_description(
     text = normalize_user_text(payload.text)
     if not text:
         raise HTTPException(status_code=400, detail="Empty job description")
+    enforce_prompt_injection_guard(text=text, field_name="job_description")
+    enforce_job_description_like(text=text, field_name="job_description")
 
     doc = create_document(
         kind="job_description",

@@ -14,6 +14,11 @@ from app.services.langgraph.streaming_agent import (
     stream_generation,
     stream_generation_with_missing_skills,
 )
+from app.services.guardrails import (
+    enforce_job_description_like,
+    enforce_prompt_injection_guard,
+    enforce_resume_like,
+)
 from app.services.text_guardrails import normalize_user_text
 
 router = APIRouter()
@@ -60,6 +65,10 @@ async def generate_stream(
         raise HTTPException(status_code=400, detail="Missing resume text")
     if not jd_text:
         raise HTTPException(status_code=400, detail="Missing job description text")
+    enforce_prompt_injection_guard(text=resume_text, field_name="resume_text")
+    enforce_prompt_injection_guard(text=jd_text, field_name="job_description_text")
+    enforce_resume_like(text=resume_text, field_name="resume_text")
+    enforce_job_description_like(text=jd_text, field_name="job_description_text")
 
     async def event_stream():
         try:
@@ -122,6 +131,10 @@ async def generate_with_missing_skills(
         raise HTTPException(status_code=400, detail="Missing resume text")
     if not jd_text:
         raise HTTPException(status_code=400, detail="Missing job description text")
+    enforce_prompt_injection_guard(text=resume_text, field_name="resume_text")
+    enforce_prompt_injection_guard(text=jd_text, field_name="job_description_text")
+    enforce_resume_like(text=resume_text, field_name="resume_text")
+    enforce_job_description_like(text=jd_text, field_name="job_description_text")
 
     # Collect results from the streaming generator
     result = {"gap_analysis": None, "tailored_resume": None}

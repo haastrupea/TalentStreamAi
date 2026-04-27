@@ -81,8 +81,23 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS usage_monthly (
+              user_id TEXT NOT NULL,
+              period_yyyymm TEXT NOT NULL,
+              llm_prompt_tokens INTEGER NOT NULL DEFAULT 0,
+              llm_completion_tokens INTEGER NOT NULL DEFAULT 0,
+              base_resume_uploads INTEGER NOT NULL DEFAULT 0,
+              applications_created INTEGER NOT NULL DEFAULT 0,
+              updated_at TEXT NOT NULL,
+              PRIMARY KEY (user_id, period_yyyymm)
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_app_records_user ON application_records(user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_app_records_created ON application_records(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_period ON usage_monthly(period_yyyymm)")
         conn.commit()
     finally:
         conn.close()
@@ -309,6 +324,25 @@ class ApplicationRecord:
     created_at: str
 
 
+@dataclass(frozen=True)
+class UsageSnapshot:
+    user_id: str
+    period_yyyymm: str
+    llm_prompt_tokens: int
+    llm_completion_tokens: int
+    base_resume_uploads: int
+    applications_created: int
+
+    @property
+    def total_llm_tokens(self) -> int:
+        return self.llm_prompt_tokens + self.llm_completion_tokens
+
+
+def current_period_yyyymm() -> str:
+    now = datetime.now(UTC)
+    return f"{now.year:04d}{now.month:02d}"
+
+
 def create_application(
     *,
     user_id: str,
@@ -468,3 +502,79 @@ def dashboard_aggregates(*, user_id: str) -> dict[str, int | float]:
         "average_match_score": float(avg) if avg else 0.0,
         "resumes_generated": int(n_tailored),
     }
+
+
+def get_usage_snapshot(*, user_id: str, period_yyyymm: str | None = None) -> UsageSnapshot:
+    period = period_yyyymm or current_period_yyyymm()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT user_id, period_yyyymm, llm_prompt_tokens, llm_completion_tokens,
+                   base_resume_uploads, applications_created
+            FROM usage_monthly
+            WHERE user_id = ? AND period_yyyymm = ?
+            LIMIT 1
+            """,
+            (user_id, period),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return UsageSnapshot(
+            user_id=user_id,
+            period_yyyymm=period,
+            llm_prompt_tokens=0,
+            llm_completion_tokens=0,
+            base_resume_uploads=0,
+            applications_created=0,
+        )
+    return UsageSnapshot(
+        user_id=row["user_id"],
+        period_yyyymm=row["period_yyyymm"],
+        llm_prompt_tokens=int(row["llm_prompt_tokens"] or 0),
+        llm_completion_tokens=int(row["llm_completion_tokens"] or 0),
+        base_resume_uploads=int(row["base_resume_uploads"] or 0),
+        applications_created=int(row["applications_created"] or 0),
+    )
+
+
+def bump_usage(
+    *,
+    user_id: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    base_resume_uploads: int = 0,
+    applications_created: int = 0,
+    period_yyyymm: str | None = None,
+) -> UsageSnapshot:
+    period = period_yyyymm or current_period_yyyymm()
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO usage_monthly (
+                user_id, period_yyyymm, llm_prompt_tokens, llm_completion_tokens,
+                base_resume_uploads, applications_created, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, period_yyyymm) DO UPDATE SET
+                llm_prompt_tokens = llm_prompt_tokens + excluded.llm_prompt_tokens,
+                llm_completion_tokens = llm_completion_tokens + excluded.llm_completion_tokens,
+                base_resume_uploads = base_resume_uploads + excluded.base_resume_uploads,
+                applications_created = applications_created + excluded.applications_created,
+                updated_at = excluded.updated_at
+            """,
+            (
+                user_id,
+                period,
+                max(0, int(prompt_tokens)),
+                max(0, int(completion_tokens)),
+                max(0, int(base_resume_uploads)),
+                max(0, int(applications_created)),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return get_usage_snapshot(user_id=user_id, period_yyyymm=period)

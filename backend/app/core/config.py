@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 5 * 1024 * 1024
     max_text_chars: int = 80_000
     max_output_chars: int = 120_000
+    input_injection_mode: str = "warn"
+    expected_input_mode: str = "block"
+    resume_validation_min_score: float = 0.35
+    job_description_validation_min_score: float = 0.30
 
     sqlite_path: str = ".data/talentstreamai.sqlite3"
     upload_dir: str = ".data/uploads"
@@ -59,6 +63,18 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.2
     openrouter_referer: str | None = None
     openrouter_title: str | None = None
+    plan_claim_path: str = "public_metadata.plan"
+    plan_default: str = "free"
+    plan_alias_map: str = ""
+    free_monthly_llm_token_budget: int = 25_000
+    free_monthly_application_limit: int = 1
+    free_monthly_base_resume_limit: int = 2
+    starter_monthly_llm_token_budget: int = 250_000
+    starter_monthly_application_limit: int = 120
+    starter_monthly_base_resume_limit: int = 10
+    pro_monthly_llm_token_budget: int = 1_000_000
+    pro_monthly_application_limit: int = 500
+    pro_monthly_base_resume_limit: int = 50
 
     # Product: reported match % for the AI-tailored resume (floor/cap; not a third-party ATS guarantee)
     min_tailored_match_score: int = 90
@@ -117,6 +133,13 @@ class Settings(BaseSettings):
     @field_validator("auth_mode", "agent_mode", "upload_storage", mode="before")
     @classmethod
     def _normalize_lower_modes(cls, value: str | None) -> str | None:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+    @field_validator("input_injection_mode", "expected_input_mode", "plan_default", mode="before")
+    @classmethod
+    def _normalize_lower_fields(cls, value: str | None) -> str | None:
         if isinstance(value, str):
             return value.strip().lower()
         return value
