@@ -12,13 +12,15 @@ from app.api.v1 import (
     resumes,
 )
 
+prefix = '/v1'
+
 api_router = APIRouter()
-api_router.include_router(health.router, prefix="/v1", tags=["health"])
-api_router.include_router(observability.router, prefix="/v1", tags=["observability"])
-api_router.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
-api_router.include_router(profile.router, prefix="/v1", tags=["profile"])
-api_router.include_router(dashboard.router, prefix="/v1", tags=["dashboard"])
-api_router.include_router(applications.router, prefix="/v1", tags=["applications"])
-api_router.include_router(resumes.router, prefix="/v1", tags=["resumes"])
-api_router.include_router(job_descriptions.router, prefix="/v1", tags=["job_descriptions"])
-api_router.include_router(generation.router, prefix="/v1", tags=["generation"])
+api_router.include_router(health.router, prefix=prefix, tags=["health"])
+api_router.include_router(observability.router, prefix=prefix, tags=["observability"])
+api_router.include_router(auth.router, prefix=f"{prefix}/auth", tags=["auth"])
+api_router.include_router(profile.router, prefix=prefix, tags=["profile"])
+api_router.include_router(dashboard.router, prefix=prefix, tags=["dashboard"])
+api_router.include_router(applications.router, prefix=prefix, tags=["applications"])
+api_router.include_router(resumes.router, prefix=prefix, tags=["resumes"])
+api_router.include_router(job_descriptions.router, prefix=prefix, tags=["job_descriptions"])
+api_router.include_router(generation.router, prefix=prefix, tags=["generation"])

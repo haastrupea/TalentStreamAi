@@ -13,6 +13,9 @@ def _jwk_client(jwks_url: str):
 
 class ClerkJwtVerifier:
     def verify(self, token: str) -> dict[str, Any]:
+        print("======================================")
+        print(token)
+        print("======================================")
         try:
             import jwt
         except Exception as e:

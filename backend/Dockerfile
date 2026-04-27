@@ -14,7 +14,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 COPY app ./app
+COPY server.py lambda_handler.py ./
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "server.py"]

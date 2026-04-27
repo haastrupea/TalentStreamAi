@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     )
 
     # Loaded from API_HOST, API_PORT, CORS_ORIGINS (see repository root .env / .env.example)
-    api_host: str
-    api_port: int
-    cors_origins: str
+    api_host: str | None = None
+    api_port: int | None = None
+    cors_origins: str | None = None
     deployment_environment: str | None = None
     # Chat completions: OPENROUTER_API_KEY when using OpenRouter; else OPENAI_API_KEY alone.
     openrouter_api_key: str | None = Field(
@@ -30,7 +30,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
     )
 
-    auth_mode: str = "clerk_jwks"
+    auth_mode: str = "disabled"
+    # auth_mode: str = "clerk_jwks"
     clerk_jwks_url: str | None = None
     clerk_issuer: str | None = None
     clerk_audience: str | None = None
@@ -50,8 +51,8 @@ class Settings(BaseSettings):
     s3_sse: str = "AES256"
     s3_kms_key_id: str | None = None
 
-    agent_mode: str = "stub"
-    llm_base_url: str = "https://api.openai.com"
+    agent_mode: str = "llm"
+    llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_model: str = "gpt-4.1-mini"
     llm_timeout_seconds: float = 45.0
     llm_max_tokens: int = 1800
@@ -93,9 +94,10 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        return [
-            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
-        ]
+        raw = (self.cors_origins or "").strip()
+        if not raw:
+            return []
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
     @property
     def chat_completions_api_key(self) -> str | None:
