@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
@@ -16,17 +17,9 @@ from app.services.observability.langfuse_tracing import ensure_langfuse_ready, f
 configure_logging()
 slog = structlog.get_logger(__name__)
 
-app = FastAPI(
-    title="TalentStreamAI API",
-    version="0.1.0",
-    description="Backend service for the TalentStreamAI (FastAPI, LangGraph, observability).",
-)
 
-app.add_exception_handler(Exception, global_exception_handler)
-
-
-@app.on_event("startup")
-def _startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
     slog.info("service_starting", environment=settings.deployment_environment or "local")
     if ensure_langfuse_ready():
@@ -69,11 +62,20 @@ def _startup() -> None:
         if settings.s3_sse == "aws:kms" and not settings.s3_kms_key_id:
             raise RuntimeError("S3_SSE=aws:kms requires S3_KMS_KEY_ID.")
 
+    yield
 
-@app.on_event("shutdown")
-async def _shutdown() -> None:
     await close_llm_http_clients()
     flush_langfuse()
+
+
+app = FastAPI(
+    title="TalentStreamAI API",
+    version="0.1.0",
+    description="Backend service for the TalentStreamAI (FastAPI, LangGraph, observability).",
+    lifespan=lifespan,
+)
+
+app.add_exception_handler(Exception, global_exception_handler)
 
 
 app.add_middleware(
