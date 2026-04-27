@@ -63,3 +63,9 @@ htmlcov/
 
 # Backend local data (sqlite, uploads)
 backend/.data/
+
+# Lambda packaging artifacts
+backend/lambda-package/
+backend/lambda-deployment.zip
+backend/requirements.txt
+terraform/bootstrap_lambda.zip

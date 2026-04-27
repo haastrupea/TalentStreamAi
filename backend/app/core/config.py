@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     s3_kms_key_id: str | None = None
 
     agent_mode: str = "llm"
-    llm_base_url: str = "https://openrouter.ai/api/v1"
+    llm_base_url: str = "https://openrouter.ai/api"
     llm_model: str = "gpt-4.1-mini"
     llm_timeout_seconds: float = 45.0
     llm_max_tokens: int = 1800

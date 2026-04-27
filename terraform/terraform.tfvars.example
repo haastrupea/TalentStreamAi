@@ -1,3 +1,35 @@
 aws_region   = "us-east-1"
 project_name = "talentstreamai"
 environment  = "dev"
+
+static_site_bucket_name = "talentstreamai-dev-static-example"
+uploads_bucket_name     = "talentstreamai-dev-uploads-example"
+
+lambda_function_name  = "talentstreamai-api-dev"
+deployment_environment = "prod"
+auth_mode             = "clerk_jwks"
+clerk_jwks_url        = "https://your-clerk-domain/.well-known/jwks.json"
+clerk_issuer          = "https://your-clerk-domain"
+clerk_audience        = ""
+
+agent_mode            = "llm"
+sqlite_busy_timeout_ms = 5000
+sqlite_enable_wal      = true
+log_json               = true
+log_level              = "INFO"
+enable_prometheus      = false
+
+llm_base_url        = "https://api.openai.com"
+llm_model           = "gpt-4.1-mini"
+llm_timeout_seconds = 45
+llm_max_tokens      = 1800
+llm_temperature     = 0.2
+
+openrouter_api_key      = ""
+openai_api_key          = ""
+openrouter_referer      = ""
+openrouter_title        = ""
+langfuse_public_key     = ""
+langfuse_secret_key     = ""
+langfuse_base_url       = ""
+langfuse_tracing_enabled = false

@@ -122,36 +122,11 @@ Stop everything with `./scripts/stop.sh`.
 
 ## Terraform (single root under `terraform/`)
 
-`main.tf` holds the `terraform {}` block (including the empty **S3** `backend "s3" {}` stub), a `locals` name helper, and a **numbered checklist** for the architecture you are building toward. There are **no `resource` blocks** in this repository on purpose.
+Terraform now contains the active AWS stack for this project (CloudFront + S3 static site, API Gateway + Lambda, VPC/NAT/EFS, and uploads bucket).
 
-`variables.tf` / `outputs.tf` / `providers.tf` give you tagging defaults and a couple of outputs (`stack_name`, `aws_region`, `next_steps`) so CI and humans can sanity-check wiring before anyone adds modules or resources.
+For deploy steps, environment wiring, backend zip publishing, and frontend sync/invalidation, use:
 
-Nothing in the FastAPI or Next.js code hardcodes `dev`/`staging`/`prod`. Terraform’s `environment` variable is validated to those three values for tags and future state keys.
-
-### Remote state
-
-The `terraform {}` block declares an **S3 backend** (empty configuration). Every `terraform init` needs either:
-
-- `terraform/backend.hcl` (copy `terraform/backend.hcl.example`), or
-- `TALENTSTREAM_USE_LOCAL_TF_STATE=1` with `./scripts/deploy-aws.sh` for disposable local state (not for teams).
-
-### Plan / destroy helpers
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# set aws_region, project_name, environment (dev | staging | prod)
-```
-
-From the repository root:
-
-```bash
-./scripts/deploy-aws.sh            # writes a plan (no apply)
-./scripts/deploy-aws.sh staging
-TF_ENVIRONMENT=prod ./scripts/deploy-aws.sh
-```
-
-`./scripts/destroy-aws.sh` is a thin wrapper around `terraform destroy` for when resources eventually exist.
+- [`terraform/README.md`](terraform/README.md)
 
 ## Project structure
 
