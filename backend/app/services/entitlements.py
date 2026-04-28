@@ -21,22 +21,6 @@ class ResolvedPlan:
     limits: PlanLimits
 
 
-def _plan_aliases() -> dict[str, str]:
-    out: dict[str, str] = {}
-    raw = (settings.plan_alias_map or "").strip()
-    if not raw:
-        return out
-    for chunk in raw.split(","):
-        if ":" not in chunk:
-            continue
-        source, target = chunk.split(":", 1)
-        source = source.strip().lower()
-        target = target.strip().lower()
-        if source and target:
-            out[source] = target
-    return out
-
-
 def _plan_limits_map() -> dict[str, PlanLimits]:
     return {
         "free": PlanLimits(
@@ -70,19 +54,23 @@ def _extract_from_claim_path(claims: dict[str, Any], path: str) -> str:
         return ""
     return str(cur).strip()
 
+def parse_claim_plan(raw_plan: str):
+    identifier, plan = raw_plan.split(":", 1)
+    if (identifier or '').lower() == 'u':
+        return plan.lower()
+    return 'free'
 
 def resolve_user_plan(claims: dict[str, Any]) -> ResolvedPlan:
     limits_map = _plan_limits_map()
     default_plan = settings.plan_default if settings.plan_default in limits_map else "free"
-    claim_path = (settings.plan_claim_path or "").strip() or "public_metadata.plan"
-    raw = _extract_from_claim_path(claims, claim_path).lower()
-    aliases = _plan_aliases()
-    resolved = aliases.get(raw, raw)
+    claim_path = (settings.plan_claim_path or "").strip() or "pla"
+    raw_plan = _extract_from_claim_path(claims, claim_path).lower()
+    resolved = parse_claim_plan(raw_plan)
     if resolved not in limits_map:
         resolved = default_plan
     return ResolvedPlan(
         plan_key=resolved,
-        raw_value=raw,
+        raw_value=raw_plan,
         claim_path=claim_path,
         limits=limits_map[resolved],
     )

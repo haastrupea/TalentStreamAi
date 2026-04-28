@@ -63,9 +63,8 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.2
     openrouter_referer: str | None = None
     openrouter_title: str | None = None
-    plan_claim_path: str = "public_metadata.plan"
+    plan_claim_path: str = "pla"
     plan_default: str = "free"
-    plan_alias_map: str = ""
     free_monthly_llm_token_budget: int = 25_000
     free_monthly_application_limit: int = 1
     free_monthly_base_resume_limit: int = 2
