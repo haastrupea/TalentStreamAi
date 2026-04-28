@@ -73,6 +73,7 @@ app = FastAPI(
     version="0.1.0",
     description="Backend service for the TalentStreamAI (FastAPI, LangGraph, observability).",
     lifespan=lifespan,
+    openapi_url="/api/openapi.json"
 )
 
 app.add_exception_handler(Exception, global_exception_handler)
